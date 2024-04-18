@@ -1,0 +1,78 @@
+import pandas as pd
+import rioxarray
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.impute import SimpleImputer
+import numpy as np
+
+# Load the training data
+train_data = pd.read_csv('/content/Ready_for_GIS.csv')
+
+# Specify the feature columns
+features = ['Elevation Mean', 'Tmin_Celcius', 'GHI_KJ_day', 'AAP Mean/12']
+
+# Specify the target column
+target = 'Psychoactive (0/1)
+
+# Split the data into training and test sets
+X_train, X_test, y_train, y_test = train_test_split(train_data[features], train_data[target], test_size=0.25, random_state=42)
+
+# Create the imputer
+imputer = SimpleImputer(missing_values=np.nan, strategy='mean')
+
+# Fit the imputer and transform the training data
+X_train_imputed = imputer.fit_transform(X_train)
+
+# Create the Random Forest model
+model = RandomForestClassifier(n_estimators=1000, random_state=42)
+
+# Train the model
+model.fit(X_train_imputed, y_train)
+
+# When making predictions, remember to apply the same imputation to the test data
+X_test_imputed = imputer.transform(X_test)
+y_pred = model.predict(X_test_imputed)
+
+# Calculate the accuracy of the model
+accuracy = accuracy_score(y_test, y_pred)
+
+print(f'Training Model Accuracy: {accuracy}')
+from sklearn.metrics import confusion_matrix
+y_pred_test = model.predict(X_test)
+
+print(f'Training Model Accuracy: {accuracy}')
+from sklearn.metrics import confusion_matrix
+confusion_matrix(y_test, y_pred_test)
+cm = confusion_matrix(y_test, y_pred_test)
+cm_df = pd.DataFrame(cm, index=['Actual 0', 'Actual 1'], columns=['Predicted 0', 'Predicted 1'])
+
+# Load the raster data factors
+algon_elev = rioxarray.open_rasterio('/content/Queen_Eliz_Elevation.tif')
+algon_tmin = rioxarray.open_rasterio('/content/Queen_Eliz_Tmin_04.tif')
+algon_sun = rioxarray.open_rasterio('/content/Queen_Eliz_Sun_04.tif')
+algon_rain = rioxarray.open_rasterio('/content/Queen_Eliz_Prec_04.tif')
+
+geotiff_features = pd.DataFrame({
+    'Elevation Mean': algon_elev.values.flatten(),
+    'Tmin_Celcius': algon_tmin.values.flatten(),
+    'GHI_KJ_day': algon_sun.values.flatten(),
+    'AAP Mean/12': algon_rain.values.flatten()
+})
+
+# Impute the GeoTIFF data
+geotiff_features_imputed = imputer.transform(geotiff_features)
+
+# Predict the probabilities of each region being a probable site for psychoactive plant evolution
+probabilities = model.predict_proba(geotiff_features_imputed)[:, 1]  # get the probabilities for the positive class
+
+# Reshape the probabilities to match the original shape of the GeoTIFF data
+probabilities_reshaped = probabilities.reshape(algon_elev.shape[1], algon_elev.shape[2])
+
+# Visualize the probabilities
+plt.imshow(probabilities_reshaped, cmap='hot', interpolation='nearest')
+plt.colorbar(label='Probability')
+plt.title('Probable Areas for Psychoactive Plant Evolution')
+plt.show()
