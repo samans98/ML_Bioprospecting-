@@ -1,0 +1,69 @@
+"""this script will determine the elevation(m) and soil class present where an observation was made"""
+#Function for retrieving elevation and soil class from respective API 
+def get_elevation(lat, lon):
+    try:
+        # Get elevation data from the Open-Elevation API
+        url = f'https://api.open-elevation.com/api/v1/lookup?locations={lat},{lon}'
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            if 'results' in data and data['results']:
+                elevation = data['results'][0]['elevation']
+            else:
+                elevation = None
+        else:
+            print(f"Error retrieving elevation: {response.status_code}")
+            elevation = None
+    except Exception as e:
+        print(f"Error retrieving elevation: {e}")
+        elevation = None
+
+    return elevation
+
+def get_soil_class(lat, lon):
+    try:
+        # URL for soil classification API
+        url = f"https://rest.isric.org/soilgrids/v2.0/classification/query?lon={lon}&lat={lat}&number_classes=0"
+        
+        # Define retry strategy with exponential backoff
+        retries = Retry(total=5,
+                        backoff_factor=1,
+                        status_forcelist=[429, 500, 502, 503, 504])
+
+        # Use the retry strategy with requests
+        session = requests.Session()
+        session.mount('https://', HTTPAdapter(max_retries=retries))
+
+        response = session.get(url)
+        if response.status_code == 200:
+            # Extract the soil classification from the response
+            soil_class = response.json()['wrb_class_name']
+        else:
+            print(f"Error retrieving soil class: {response.status_code}")
+            soil_class = None
+    except Exception as e:
+        print(f"Error retrieving soil class: {e}")
+        soil_class = None
+
+    return soil_class
+
+def get_elevation_and_soil_class(lat, lon):
+    elevation = get_elevation(lat, lon)
+    soil_class = get_soil_class(lat, lon)
+    return elevation, soil_class
+
+def apply_to_coordinates(latitudes, longitudes):
+    results = []
+    for lat, lon in zip(latitudes, longitudes):
+        elevation, soil_class = get_elevation_and_soil_class(lat, lon)
+        results.append((lat, lon, elevation, soil_class))
+    return results
+
+results = apply_to_coordinates(list_lat, list_lon)
+
+for result in results:
+    lat, lon, elevation, soil_class = result
+    print(f"Latitude: {lat}, Longitude: {lon}")
+    print(f"Elevation: {elevation} meters")
+    print(f"Soil Class: {soil_class}")
+    print()
