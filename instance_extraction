@@ -1,0 +1,97 @@
+"""This file is concerning with extracting instances of hits and no hits using the GBIF database"""
+!pip install pygbif
+!pip install requests
+!pip install mpimg
+ 
+#GBIF Connection 
+%env GBIF_USER=****
+%env GBIF_PWD=*****
+%env GBIF_EMAIL=****
+gbif_user = os.environ.get("GBIF_USER")
+gbif_pwd = os.environ.get("GBIF_PWD")
+gbif_email = os.environ.get("GBIF_EMAIL")
+
+#Create list of species that exhibit the desired trait. These entities will be 'hits'.
+species_names = []
+  
+#Empty lists to store latitude, longitude, and taxonKey values for species_name
+latitude_list = []
+longitude_list = []
+taxonKey_list = []
+species_list = []
+
+#Iterate through each plant name
+for x in species_names:
+    # Perform search for the current species name
+    result = occ.search(q=x, limit=3, spellcheck=True)
+
+    #Iterate through each result in the search
+    for res in result['results']:
+        #Check if the keys exist before accessing them
+        if 'decimalLatitude' in res and 'decimalLongitude' in res and 'taxonKey' in res:
+            #extract latitude, longitude, and taxonKey from the current result
+            latitude = res['decimalLatitude']
+            longitude = res['decimalLongitude']
+            taxonKey = res['taxonKey']
+            species = res['scientificName']
+
+            latitude_list.append(latitude)
+            longitude_list.append(longitude)
+            taxonKey_list.append(taxonKey)
+            species_list.append(species)
+data = {
+    'Latitude': latitude_list,
+    'Longitude': longitude_list,
+    'TaxonKey': taxonKey_list,
+    'Name': species_list}
+
+df_hits = pd.DataFrame(data)
+
+#Obtaing random values to use in conjunction with hit data. This script is set for only entres where kingomKey = 6 (plant species), adjust if necessary.
+#Additionally, adjust range value and occurance search limit as appropriate. 
+
+random_observation_list = []
+for _ in range(10000):
+    random_taxonKey_list = []
+    random_latitude_list = []
+    random_longitude_list = []
+    random_species_list = []
+    
+    # Generate a random taxonKey and search occurance
+    random_taxonKey = random.randint(1000000, 9999999)
+    result = occ.search(taxonKey=random_taxonKey, limit=2)
+    
+    #Check if the result exists and belongs to the kingdom Plantae
+    while 'results' not in result or len(result['results']) == 0 or result['results'][0]['kingdomKey'] != 6:
+        random_taxonKey = random.randint(1000000, 9999999)
+        result = occ.search(taxonKey=random_taxonKey, limit=1)
+    res = result['results'][0]
+    
+    #Check if the keys exist before accessing them
+    if 'decimalLatitude' in res and 'decimalLongitude' in res and 'taxonKey' in res:
+        # Extract latitude, longitude, and taxonKey from the current result
+        random_latitude = res['decimalLatitude']
+        random_longitude = res['decimalLongitude']
+        random_taxonKey = res['taxonKey']
+        random_species = res['scientificName']
+
+        #Append latitude, longitude, and taxonKey to their respective lists
+        random_latitude_list.append(random_latitude)
+        random_longitude_list.append(random_longitude)
+        random_taxonKey_list.append(random_taxonKey)
+        random_species_list.append(random_species)
+    
+    #DataFrame from lists
+    df_random_observation = pd.DataFrame({
+        'Latitude': random_latitude_list,
+        'Longitude': random_longitude_list,
+        'TaxonKey': random_taxonKey_list,
+        'Name': random_species_list
+    })
+    
+    # Append DataFrame to list
+    random_observation_list.append(df_random_observation)
+df_random = pd.concat(random_observation_list, ignore_index=True)
+#if necessary, drop observations that is a species within your species_list- drop using taxonKey.
+
+
